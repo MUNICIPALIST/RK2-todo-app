@@ -3,8 +3,8 @@ pipeline {
 
   environment {
     NODE_ENV = "production"
-    IMAGE_NAME = "tg/todo-app"
-    IMAGE_TAG = "1.0"
+    IMAGE_NAME = "municipalist/todo-app"
+    IMAGE_TAG = "latest"
     REGISTRY_CREDENTIALS = "docker-hub" // Jenkins credentials ID
   }
 

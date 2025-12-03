@@ -91,7 +91,7 @@ service. Update the file if you need custom credentials or ports.
 
 3. **Create credentials**  
    - Add Docker registry creds (Manage Jenkins → Credentials) with ID `docker-hub`.  
-   - This user needs push access to `tg/todo-app`.
+   - This user needs push access to `municipalist/todo-app`.
 
 4. **Create a Pipeline job**  
    - New Item → “Pipeline” → point to this repo.  
@@ -101,7 +101,7 @@ service. Update the file if you need custom credentials or ports.
    - `Install`: `npm ci` (clean dependency install).  
    - `Test`: `npm test` (currently runs ESLint).  
    - `Build`: `npm run build` (Next.js production build).  
-   - `Docker Build`: `docker build -t tg/todo-app:1.0 .`.  
+   - `Docker Build`: `docker build -t municipalist/todo-app:latest .`.  
    - `Push`: logs into Docker Hub via `docker-hub` credentials and pushes the image.
 
 6. **Triggering builds**  
@@ -115,7 +115,7 @@ Manifests live under `k8s/`:
 
 - `configmap.yaml` – non-secret app config (`APP_NAME`, `PORT`).
 - `secret.yaml` – stores `DATABASE_URL` via `stringData` (replace with production DSN or use Sealed Secrets).
-- `deployment.yaml` – runs 2 replicas of `valtzmanmagnus/todo-app:1.0`, wires probes, envs, and resource requests.
+- `deployment.yaml` – runs 2 replicas of `municipalist/todo-app:latest`, wires probes, envs, and resource requests.
 - `service.yaml` – `NodePort` exposure on `30080` to reach the Next.js server running on container port `3000`.
 - `hpa.yaml` – autoscaling policy: CPU 50% target, min 2 / max 5 pods (requires Metrics Server).
 
@@ -139,7 +139,7 @@ export KUBECONFIG=$PWD/k3s.yaml
 
 ### Deploying
 
-1. Build and push the Docker image (`docker push valtzmanmagnus/todo-app:1.0`).
+1. Build and push the Docker image (`docker push municipalist/todo-app:latest`).
 2. Update `k8s/secret.yaml` with the *real* `DATABASE_URL`.
 3. Apply the manifests:
 
