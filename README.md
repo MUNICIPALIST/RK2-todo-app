@@ -17,7 +17,7 @@ persistence, Tailwind-powered UI, and Dockerized runtime in one project.
 - Create, toggle, and delete todos via REST endpoints
 - Server-side validation powered by `zod`
 - Automatic table provisioning on boot
-- Production-ready Dockerfile with standalone Next output
+- Production-ready `Dockerfile_Arkinov_Zhanbolat` with standalone Next output
 
 ## Local Development
 
@@ -34,10 +34,10 @@ persistence, Tailwind-powered UI, and Dockerized runtime in one project.
    # update DATABASE_URL if you're not using the defaults
    ```
 
-3. Start PostgreSQL (either your own instance or via Docker):
+3. Start PostgreSQL (either your own instance or via Docker Compose file `docker-compose_Arkinov_Zhanbolat.yml`):
 
    ```bash
-   docker compose up -d db
+   docker compose -f docker-compose_Arkinov_Zhanbolat.yml up -d db
    ```
 
 4. Run the app:
@@ -65,10 +65,10 @@ Everything — Next.js server and PostgreSQL — can run with one command:
 
 ```bash
 # build and run both services
-docker compose up --build
+docker compose -f docker-compose_Arkinov_Zhanbolat.yml up --build
 
 # stop containers
-docker compose down
+docker compose -f docker-compose_Arkinov_Zhanbolat.yml down
 ```
 
 `env.docker` contains the environment defaults consumed by the `web`
@@ -95,9 +95,9 @@ service. Update the file if you need custom credentials or ports.
 
 4. **Create a Pipeline job**  
    - New Item → “Pipeline” → point to this repo.  
-   - Jenkins will automatically use the root `Jenkinsfile`.
+   - Set “Script Path” to `Jenkinsfile_Arkinov_Zhanbolat`.
 
-5. **Pipeline stages (defined in `Jenkinsfile`)**
+5. **Pipeline stages (defined in `Jenkinsfile_Arkinov_Zhanbolat`)**
    - `Install`: `npm ci` (clean dependency install).  
    - `Test`: `npm test` (currently runs ESLint).  
    - `Build`: `npm run build` (Next.js production build).  
@@ -107,17 +107,17 @@ service. Update the file if you need custom credentials or ports.
 6. **Triggering builds**  
    - Click “Build Now” or configure Git webhooks so pushes run automatically.  
    - Each run archives the optimized Next.js build and publishes a Docker image ready
-     for deployment together with the existing `docker-compose.yml`.
+     for deployment together with `docker-compose_Arkinov_Zhanbolat.yml`.
 
 ## Kubernetes (k3s/k8s) Deployment
 
 Manifests live under `k8s/`:
 
-- `configmap.yaml` – non-secret app config (`APP_NAME`, `PORT`).
-- `secret.yaml` – stores `DATABASE_URL` via `stringData` (replace with production DSN or use Sealed Secrets).
-- `deployment.yaml` – runs 2 replicas of `municipalist/todo-app:latest`, wires probes, envs, and resource requests.
-- `service.yaml` – `NodePort` exposure on `30080` to reach the Next.js server running on container port `3000`.
-- `hpa.yaml` – autoscaling policy: CPU 50% target, min 2 / max 5 pods (requires Metrics Server).
+- `configmap_Arkinov_Zhanbolat.yaml` – non-secret app config (`APP_NAME`, `PORT`).
+- `secret_Arkinov_Zhanbolat.yaml` – stores `DATABASE_URL` via `stringData` (replace with production DSN or use Sealed Secrets).
+- `deployment_Arkinov_Zhanbolat.yaml` – runs 2 replicas of `municipalist/todo-app:latest`, wires probes, envs, and resource requests.
+- `service_Arkinov_Zhanbolat.yaml` – `NodePort` exposure on `30080` to reach the Next.js server running on container port `3000`.
+- `hpa_Arkinov_Zhanbolat.yaml` – autoscaling policy: CPU 50% target, min 2 / max 5 pods (requires Metrics Server).
 
 ### Installing k3s locally on macOS
 
@@ -140,15 +140,15 @@ export KUBECONFIG=$PWD/k3s.yaml
 ### Deploying
 
 1. Build and push the Docker image (`docker push municipalist/todo-app:latest`).
-2. Update `k8s/secret.yaml` with the *real* `DATABASE_URL`.
+2. Update `k8s/secret_Arkinov_Zhanbolat.yaml` with the *real* `DATABASE_URL`.
 3. Apply the manifests:
 
    ```bash
-   kubectl apply -f k8s/configmap.yaml
-   kubectl apply -f k8s/secret.yaml
-   kubectl apply -f k8s/deployment.yaml
-   kubectl apply -f k8s/service.yaml
-   kubectl apply -f k8s/hpa.yaml
+   kubectl apply -f k8s/configmap_Arkinov_Zhanbolat.yaml
+   kubectl apply -f k8s/secret_Arkinov_Zhanbolat.yaml
+   kubectl apply -f k8s/deployment_Arkinov_Zhanbolat.yaml
+   kubectl apply -f k8s/service_Arkinov_Zhanbolat.yaml
+   kubectl apply -f k8s/hpa_Arkinov_Zhanbolat.yaml
    ```
 
 4. Verify:
@@ -166,3 +166,27 @@ export KUBECONFIG=$PWD/k3s.yaml
    ```
 
 For real environments, replace `NodePort` with `LoadBalancer`/Ingress, wire a managed PostgreSQL instance, and rotate secrets via your preferred secret manager.
+
+## Provisioning with Ansible
+
+The `ansible/` directory contains an idempotent playbook that prepares a fresh Ubuntu
+host with Docker, kind-based Kubernetes, Jenkins, and then deploys the manifests in
+`k8s/`.
+
+1. Update `ansible/inventory.ini` with your server IP/SSH user.
+2. Optional vars to override live at the top of `ansible/playbook_Arkinov_Zhanbolat.yml` (cluster name, versions, etc.).
+3. Run the playbook from repo root:
+
+   ```bash
+   ansible-playbook -i ansible/inventory.ini ansible/playbook_Arkinov_Zhanbolat.yml
+   ```
+
+The playbook will:
+- install Docker Engine and start the service
+- download `kubectl` + `kind`
+- install Jenkins via the official repo and ensure the service is up
+- create a kind cluster (`todo-cluster` by default)
+- sync the `k8s/` manifests to `/opt/pulse-tasks/k8s`
+- apply the manifests with `kubectl apply -f /opt/pulse-tasks/k8s`
+
+You can rerun the playbook at any time; tasks stay idempotent.

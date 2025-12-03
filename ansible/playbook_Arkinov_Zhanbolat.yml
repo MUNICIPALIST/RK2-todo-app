@@ -1,0 +1,105 @@
+- hosts: devops
+  become: true
+  vars:
+    project_dir: /opt/pulse-tasks
+    kubectl_version: v1.30.2
+    kind_version: v0.22.0
+    jenkins_keyring: /usr/share/keyrings/jenkins-keyring.asc
+    kind_cluster_name: todo-cluster
+    kubeconfig_path: /root/.kube/config
+  tasks:
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - software-properties-common
+        state: present
+        update_cache: true
+
+    - name: Install Docker Engine
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Ensure Docker service is enabled
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Download kubectl
+      get_url:
+        url: https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+
+    - name: Download kind
+      get_url:
+        url: https://kind.sigs.k8s.io/dl/{{ kind_version }}/kind-linux-amd64
+        dest: /usr/local/bin/kind
+        mode: "0755"
+
+    - name: Create Jenkins keyring directory
+      file:
+        path: "{{ jenkins_keyring | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Add Jenkins repository key
+      get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        dest: "{{ jenkins_keyring }}"
+        mode: "0644"
+
+    - name: Add Jenkins apt repository
+      apt_repository:
+        repo: "deb [signed-by={{ jenkins_keyring }}] https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Install Jenkins and dependencies
+      apt:
+        name:
+          - fontconfig
+          - openjdk-17-jre
+          - jenkins
+        state: present
+
+    - name: Ensure Jenkins service is running
+      service:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Gather existing kind clusters
+      command: kind get clusters
+      register: kind_clusters
+      changed_when: false
+      failed_when: false
+
+    - name: Ensure kind cluster exists
+      command: kind create cluster --name {{ kind_cluster_name }}
+      when: kind_clusters.rc != 0 or kind_cluster_name not in kind_clusters.stdout_lines
+
+    - name: Ensure project directory exists
+      file:
+        path: "{{ project_dir }}/k8s"
+        state: directory
+        mode: "0755"
+        recurse: true
+
+    - name: Sync Kubernetes manifests
+      copy:
+        src: "{{ playbook_dir }}/../k8s/"
+        dest: "{{ project_dir }}/k8s/"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Deploy Kubernetes manifests
+      command: kubectl apply -f {{ project_dir }}/k8s/
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
