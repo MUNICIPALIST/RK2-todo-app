@@ -108,3 +108,61 @@ service. Update the file if you need custom credentials or ports.
    - Click “Build Now” or configure Git webhooks so pushes run automatically.  
    - Each run archives the optimized Next.js build and publishes a Docker image ready
      for deployment together with the existing `docker-compose.yml`.
+
+## Kubernetes (k3s/k8s) Deployment
+
+Manifests live under `k8s/`:
+
+- `configmap.yaml` – non-secret app config (`APP_NAME`, `PORT`).
+- `secret.yaml` – stores `DATABASE_URL` via `stringData` (replace with production DSN or use Sealed Secrets).
+- `deployment.yaml` – runs 2 replicas of `valtzmanmagnus/todo-app:1.0`, wires probes, envs, and resource requests.
+- `service.yaml` – `NodePort` exposure on `30080` to reach the Next.js server running on container port `3000`.
+- `hpa.yaml` – autoscaling policy: CPU 50% target, min 2 / max 5 pods (requires Metrics Server).
+
+### Installing k3s locally on macOS
+
+k3s is Linux-native, so run it inside a lightweight VM (Multipass) or use `k3d`. Below is a Multipass flow:
+
+```bash
+brew install multipass
+multipass launch --name k3s --cpus 2 --mem 4G --disk 15G
+
+# Install k3s inside the VM
+multipass exec k3s -- bash -c "curl -sfL https://get.k3s.io | sh -"
+
+# Extract kubeconfig to your host
+multipass exec k3s -- sudo cat /etc/rancher/k3s/k3s.yaml > k3s.yaml
+export KUBECONFIG=$PWD/k3s.yaml
+```
+
+(If you prefer `k3d`: `brew install k3d && k3d cluster create todo-cluster`.)
+
+### Deploying
+
+1. Build and push the Docker image (`docker push valtzmanmagnus/todo-app:1.0`).
+2. Update `k8s/secret.yaml` with the *real* `DATABASE_URL`.
+3. Apply the manifests:
+
+   ```bash
+   kubectl apply -f k8s/configmap.yaml
+   kubectl apply -f k8s/secret.yaml
+   kubectl apply -f k8s/deployment.yaml
+   kubectl apply -f k8s/service.yaml
+   kubectl apply -f k8s/hpa.yaml
+   ```
+
+4. Verify:
+
+   ```bash
+   kubectl get pods
+   kubectl get svc todo-service
+   kubectl get hpa todo-app-hpa
+   ```
+
+5. Test from the host (NodePort):
+
+   ```bash
+   curl http://<node-ip>:30080/api/todos
+   ```
+
+For real environments, replace `NodePort` with `LoadBalancer`/Ingress, wire a managed PostgreSQL instance, and rotate secrets via your preferred secret manager.
