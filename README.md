@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Pulse Tasks
 
-## Getting Started
+A full-stack Next.js todo board that ships a typed REST API, PostgreSQL
+persistence, Tailwind-powered UI, and Dockerized runtime in one project.
 
-First, run the development server:
+### Stack
+
+- Next.js 16 (App Router + React Compiler)
+- Tailwind CSS v4 (utility-first styling)
+- PostgreSQL 16 with `pg` client
+- Typed REST API routes under `/api/todos`
+- Docker + Compose for production-like local orchestration
+
+## Features
+
+- Modern glassmorphism UI with live task stats
+- Create, toggle, and delete todos via REST endpoints
+- Server-side validation powered by `zod`
+- Automatic table provisioning on boot
+- Production-ready Dockerfile with standalone Next output
+
+## Local Development
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Copy the example environment file and adjust as needed:
+
+   ```bash
+   cp env.example .env.local
+   # update DATABASE_URL if you're not using the defaults
+   ```
+
+3. Start PostgreSQL (either your own instance or via Docker):
+
+   ```bash
+   docker compose up -d db
+   ```
+
+4. Run the app:
+
+   ```bash
+   npm run dev
+   ```
+
+Visit `http://localhost:3000` to use the board.
+
+## REST API
+
+| Method | Endpoint           | Description                |
+| ------ | ------------------ | -------------------------- |
+| GET    | `/api/todos`       | List all todos             |
+| POST   | `/api/todos`       | Create `{ title: string }` |
+| PATCH  | `/api/todos/:id`   | Update title/completed     |
+| DELETE | `/api/todos/:id`   | Remove a todo              |
+
+All responses follow `{ data: ... }` or `{ error: string }`.
+
+## Dockerized Runtime
+
+Everything — Next.js server and PostgreSQL — can run with one command:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# build and run both services
+docker compose up --build
+
+# stop containers
+docker compose down
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`env.docker` contains the environment defaults consumed by the `web`
+service. Update the file if you need custom credentials or ports.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## CI/CD with Jenkins
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Install Jenkins (macOS)**  
+   ```bash
+   brew install jenkins-lts
+   brew services start jenkins-lts
+   ```
+   Visit `http://localhost:8080`, unlock Jenkins with the initial admin password
+   (`/usr/local/var/log/jenkins-lts/jenkins-lts.log`), then create an admin user.
 
-## Learn More
+2. **Prepare the build agent**  
+   - Install Node.js 20 and npm (`brew install node@20`).  
+   - Install Docker Desktop and ensure `docker` CLI works for the Jenkins user.  
+   - Add `npm`, `node`, and `docker` to the Jenkins PATH (Manage Jenkins → Tools → Global Tool Configuration).
 
-To learn more about Next.js, take a look at the following resources:
+3. **Create credentials**  
+   - Add Docker registry creds (Manage Jenkins → Credentials) with ID `docker-hub`.  
+   - This user needs push access to `tg/todo-app`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Create a Pipeline job**  
+   - New Item → “Pipeline” → point to this repo.  
+   - Jenkins will automatically use the root `Jenkinsfile`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. **Pipeline stages (defined in `Jenkinsfile`)**
+   - `Install`: `npm ci` (clean dependency install).  
+   - `Test`: `npm test` (currently runs ESLint).  
+   - `Build`: `npm run build` (Next.js production build).  
+   - `Docker Build`: `docker build -t tg/todo-app:1.0 .`.  
+   - `Push`: logs into Docker Hub via `docker-hub` credentials and pushes the image.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+6. **Triggering builds**  
+   - Click “Build Now” or configure Git webhooks so pushes run automatically.  
+   - Each run archives the optimized Next.js build and publishes a Docker image ready
+     for deployment together with the existing `docker-compose.yml`.
