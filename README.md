@@ -115,6 +115,7 @@ Manifests live under `k8s/`:
 
 - `configmap_Arkinov_Zhanbolat.yaml` – non-secret app config (`APP_NAME`, `PORT`).
 - `secret_Arkinov_Zhanbolat.yaml` – stores `DATABASE_URL` via `stringData` (replace with production DSN or use Sealed Secrets).
+- `postgres_Arkinov_Zhanbolat.yaml` – lightweight PostgreSQL 16 StatefulSet + PVC + internal `todo-db` service used by the default DATABASE_URL.
 - `deployment_Arkinov_Zhanbolat.yaml` – runs 2 replicas of `municipalist/todo-app:latest`, wires probes, envs, and resource requests.
 - `service_Arkinov_Zhanbolat.yaml` – `NodePort` exposure on `30080` to reach the Next.js server running on container port `3000`.
 - `hpa_Arkinov_Zhanbolat.yaml` – autoscaling policy: CPU 50% target, min 2 / max 5 pods (requires Metrics Server).
@@ -140,12 +141,13 @@ export KUBECONFIG=$PWD/k3s.yaml
 ### Deploying
 
 1. Build and push the Docker image (`docker push municipalist/todo-app:latest`).
-2. Update `k8s/secret_Arkinov_Zhanbolat.yaml` with the *real* `DATABASE_URL`.
+2. If you want to use an external database, update `k8s/secret_Arkinov_Zhanbolat.yaml` with that `DATABASE_URL`. Otherwise leave it pointing to the in-cluster `todo-db` service created by `postgres_Arkinov_Zhanbolat.yaml`.
 3. Apply the manifests:
 
    ```bash
    kubectl apply -f k8s/configmap_Arkinov_Zhanbolat.yaml
    kubectl apply -f k8s/secret_Arkinov_Zhanbolat.yaml
+   kubectl apply -f k8s/postgres_Arkinov_Zhanbolat.yaml
    kubectl apply -f k8s/deployment_Arkinov_Zhanbolat.yaml
    kubectl apply -f k8s/service_Arkinov_Zhanbolat.yaml
    kubectl apply -f k8s/hpa_Arkinov_Zhanbolat.yaml
